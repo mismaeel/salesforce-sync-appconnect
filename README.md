@@ -1,4 +1,4 @@
-# salesforce-sync-appconnect
+# Salesforce-sync-appconnect
 app connect sample to sync data between external system and sales force accounts using IBM app connect 
 
 ## About The Project
@@ -48,11 +48,11 @@ The config file is inlcuded in the respiratory (config.json)
 
 * Then Http Get request is sent to look up the new/updated customers on the external system. The response body is parsed to and hte CustomerId and Customer Name is used for each customer on the response using  for each flow step configured to use salesforce connecter  for account create update API, which connect to the created saleforce devloper account. checking and logging the status of the response adn then continue the rest ofthe flow.
 
-[Event-Driven-Flow-2](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/flow-part2.PNG "Flow-2") 
+![Event-Driven-Flow-2](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/flow-part2.PNG "Flow-2") 
 
 * The last part of the flow is updating the cloudant db external configuration service with the lastruntime to be used with subsequent calls.
 
-[Event-Driven-Flow-3](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/flow-part3.PNG "Flow-3") 
+![Event-Driven-Flow-3](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/flow-part3.PNG "Flow-3") 
 
 
 ## Using the flow 
@@ -72,15 +72,15 @@ I configured the flow to be trigerred every 30 minutes after the intial sync whi
 
 * The customers were created on my saleforce account for the intial sync 609 account were created ( all accounts created since  02 Jun which was used as a thershold) and every 30 minutes customer updated were synced. the service is running and the total records now since the intial sync is 630 record and will keep updating till hitting some limit on ibm cloud pricessing or salesforce account storing
 
-[customers-salesforce](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/customers-salesforce.PNG "customers-salesforce") 
+![customers-salesforce](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/customers-salesforce.PNG "customers-salesforce") 
 
-[IBM-cloud-logs](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/IBM-cloud-logs.PNG "IBM-cloud-logs") 
+![IBM-cloud-logs](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/IBM-cloud-logs.PNG "IBM-cloud-logs") 
 
-[salesforce-updated-record](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/salesforce-updated-record.PNG "salesforce-updated-record") 
+![salesforce-updated-record](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/salesforce-updated-record.PNG "salesforce-updated-record") 
 
 * The IBM cloudant external configuration service record updated during processing
 
-[cloudant-screenshot](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/cloudant-screenshot.PNG "cloudant-screenshot") 
+![cloudant-screenshot](https://raw.github.com/mismaeel/salesforce-sync-appconnect/master/resources/screenshots/cloudant-screenshot.PNG "cloudant-screenshot") 
 
 * I will provide users and creditinals for the created IBM and saleforce account to better check the implementation.
 
