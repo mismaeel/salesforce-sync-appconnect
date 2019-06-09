@@ -11,7 +11,7 @@ Here are the challeges that this project address:
 ### Built With
 There were serveral options to use to implement this project using any programing, scripting language or using iPaaS. 
 
-Here I decided to use the iPass cloud offering as it provides the agility, flexabiliy needed and allow you easily to sync and integrate between diffrenet systems. I choosed to use IBM Cloud integration offering to develop this projcet as I have pirior experince working with IBM cloud. I used IBM app connect cloud service which allow you to connect your different applications and make your business more efficient, Set up automation flows to direct how events in one application trigger actions in another, and map the information you want to share between them. 
+Here I decided to use the iPass cloud offering as it provides the agility, flexabiliy needed and allow you easily to sync and integrate between diffrenet systems. I choosed to use IBM Cloud integration offering to develop this projcet as I have pirior experince working with IBM cloud and I didn't have much time to develop and using iPass IBM cloud offering helped me to speed up the devlopments to couple of hours. I used IBM app connect cloud service which allow you to connect your different applications and make your business more efficient, Set up automation flows to direct how events in one application trigger actions in another, and map the information you want to share between them. 
 
 * [APP Connect](https://cloud.ibm.com/catalog/services/app-connect)
 * [IBM Cloud](https://cloud.ibm.com/)
