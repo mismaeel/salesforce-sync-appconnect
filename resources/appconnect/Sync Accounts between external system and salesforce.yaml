@@ -1,0 +1,744 @@
+$integration: 'http://ibm.com/appconnect/integration/v2/integrationFile'
+integration:
+  type: trigger-action
+  trigger-interfaces:
+    trigger-interface-1:
+      type: event-trigger
+      triggers:
+        SCHEDULE:
+          input-context:
+            data: scheduler
+          assembly:
+            $ref: '#/integration/assemblies/assembly-1'
+          options:
+            subscription:
+              scheduleConfiguration:
+                interval:
+                  unit: minute
+                  value: '30'
+                  runOnceOncheck: true
+                  days:
+                    - MON
+                    - TUE
+                    - WED
+                    - THU
+                    - FRI
+                    - SAT
+                    - SUN
+                  timeZone: UTC
+      connector-type: streaming-connector-scheduler
+      account-name: Account 1
+  action-interfaces:
+    action-interface-1:
+      type: api-action
+      business-object: request
+      connector-type: http
+      account-name: Account 2
+      actions:
+        INVOKE: {}
+    action-interface-3:
+      type: api-action
+      business-object: document
+      connector-type: cloudantdb
+      account-name: Account 2
+      actions:
+        RETRIEVEALL: {}
+    action-interface-7:
+      type: api-action
+      business-object: document
+      connector-type: cloudantdb
+      account-name: Account 2
+      actions:
+        UPDATEALL: {}
+    action-interface-2:
+      type: api-action
+      business-object: Account
+      connector-type: salesforce
+      account-name: Account 2
+      actions:
+        UPSERTWITHWHERE: {}
+  assemblies:
+    assembly-1:
+      assembly:
+        execute:
+          - retrieve-action:
+              name: IBM Cloudant Retrieve documents
+              target:
+                $ref: '#/integration/action-interfaces/action-interface-3'
+              filter:
+                where:
+                  and:
+                    - _id: salesforcesyncaccountsconfig
+                    - db_name: config
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                limit: 10
+              allow-truncation: true
+              pagination-type: SKIP_LIMIT
+              allow-empty-output: false
+          - if:
+              name: If 2
+              input:
+                - variable: Trigger
+                  $ref: '#/trigger/payload'
+                - variable: IBMCloudantRetrievedocuments
+                  $ref: >-
+                    #/node-output/IBM Cloudant Retrieve
+                    documents/response/payload
+                - variable: IBMCloudantRetrievedocumentsMetadata
+                  $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+              branch:
+                - condition:
+                    '{{$IBMCloudantRetrievedocuments.data.lastruntime}}':
+                      neq: 'null'
+                  execute:
+                    - logging:
+                        name: Log 3
+                        map:
+                          $map: 'http://ibm.com/appconnect/map/v1'
+                          input:
+                            - variable: Trigger
+                              $ref: '#/trigger/payload'
+                            - variable: IBMCloudantRetrievedocuments
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response/payload
+                            - variable: IBMCloudantRetrievedocumentsMetadata
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response
+                          mappings:
+                            - logLevel:
+                                template: Info
+                            - logMessage:
+                                template: 'Updating modified customers '
+                  map:
+                    $map: 'http://ibm.com/appconnect/map/v1'
+                    input:
+                      - variable: Trigger
+                        $ref: '#/trigger/payload'
+                      - variable: IBMCloudantRetrievedocuments
+                        $ref: >-
+                          #/node-output/IBM Cloudant Retrieve
+                          documents/response/payload
+                      - variable: IBMCloudantRetrievedocumentsMetadata
+                        $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                    mappings:
+                      - startingdate:
+                          template: '{{$IBMCloudantRetrievedocuments.data.lastruntime}}'
+              else:
+                execute:
+                  - logging:
+                      name: Log 4
+                      map:
+                        $map: 'http://ibm.com/appconnect/map/v1'
+                        input:
+                          - variable: Trigger
+                            $ref: '#/trigger/payload'
+                          - variable: IBMCloudantRetrievedocuments
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response/payload
+                          - variable: IBMCloudantRetrievedocumentsMetadata
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response
+                        mappings:
+                          - logLevel:
+                              template: Info
+                          - logMessage:
+                              template: Starting intial sync
+                map:
+                  $map: 'http://ibm.com/appconnect/map/v1'
+                  input:
+                    - variable: Trigger
+                      $ref: '#/trigger/payload'
+                    - variable: IBMCloudantRetrievedocuments
+                      $ref: >-
+                        #/node-output/IBM Cloudant Retrieve
+                        documents/response/payload
+                    - variable: IBMCloudantRetrievedocumentsMetadata
+                      $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  mappings:
+                    - startingdate:
+                        template: '{{$IBMCloudantRetrievedocuments.data.intialruntime}}'
+              output-schema:
+                required: []
+                properties:
+                  startingdate:
+                    type: string
+                    title: startingdate
+                title: Output Schema
+                type: object
+          - custom-action:
+              name: HTTP Invoke method
+              target:
+                $ref: '#/integration/action-interfaces/action-interface-1'
+              action: INVOKE
+              map:
+                customSchemas:
+                  properties.`requestHeaders`:
+                    type: object
+                    properties:
+                      If-Modified-Since:
+                        type: string
+                mappings:
+                  - continue2xx:
+                      expression: 'false'
+                  - method:
+                      template: GET
+                  - requestHeaders:
+                      mappings:
+                        - If-Modified-Since:
+                            template: '{{$If2.startingdate}}'
+                  - url:
+                      template: >-
+                        https://us-central1-salesforce-coding-challenge.cloudfunctions.net/sfCodingChallenge/customers
+                $map: 'http://ibm.com/appconnect/map/v1'
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+          - parse:
+              name: JSON Parser Parse
+              parse-format: json
+              source:
+                template: '{{$HTTPInvokemethod.responseBody}}'
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+              sample-data: |-
+                [
+                    {
+                        "CustomerId": 123,
+                        "CustomerName": "Testgym ChangeName 1"
+                    },
+                    {
+                        "CustomerId": 61786,
+                        "CustomerName": "Testgym 61786"
+                    },
+                    {
+                        "CustomerId": 61787,
+                        "CustomerName": "Testgym 61787"
+                    },
+                    {
+                        "CustomerId": 61788,
+                        "CustomerName": "Testgym 61788"
+                    },
+                    {
+                        "CustomerId": 61789,
+                        "CustomerName": "Testgym 61789"
+                    },
+                    {
+                        "CustomerId": 61790,
+                        "CustomerName": "Testgym 61790"
+                    },
+                    {
+                        "CustomerId": 61791,
+                        "CustomerName": "Testgym 61791"
+                    },
+                    {
+                        "CustomerId": 61792,
+                        "CustomerName": "Testgym 61792"
+                    },
+                    {
+                        "CustomerId": 61793,
+                        "CustomerName": "Testgym 61793"
+                    },
+                    {
+                        "CustomerId": 61794,
+                        "CustomerName": "Testgym 61794"
+                    },
+                    {
+                        "CustomerId": 61795,
+                        "CustomerName": "Testgym 61795"
+                    },
+                    {
+                        "CustomerId": 61796,
+                        "CustomerName": "Testgym 61796"
+                    },
+                    {
+                        "CustomerId": 61797,
+                        "CustomerName": "Testgym 61797"
+                    },
+                    {
+                        "CustomerId": 61798,
+                        "CustomerName": "Testgym 61798"
+                    },
+                    {
+                        "CustomerId": 61799,
+                        "CustomerName": "Testgym 61799"
+                    },
+                    {
+                        "CustomerId": 61800,
+                        "CustomerName": "Testgym 61800"
+                    },
+                    {
+                        "CustomerId": 61801,
+                        "CustomerName": "Testgym 61801"
+                    },
+                    {
+                        "CustomerId": 61802,
+                        "CustomerName": "Testgym 61802"
+                    },
+                    {
+                        "CustomerId": 61803,
+                        "CustomerName": "Testgym 61803"
+                    },
+                    {
+                        "CustomerId": 61804,
+                        "CustomerName": "Testgym 61804"
+                    },
+                    {
+                        "CustomerId": 61805,
+                        "CustomerName": "Testgym 61805"
+                    }
+                ]
+              output-schema:
+                $schema: 'http://json-schema.org/draft-04/schema#'
+                type: array
+                items:
+                  type: object
+                  properties:
+                    CustomerId:
+                      type: number
+                    CustomerName:
+                      type: string
+                title: Parsed JSON
+          - for-each:
+              name: For each
+              assembly:
+                $ref: '#/integration/assemblies/assembly-2'
+              source:
+                expression: '$JSONParserParse '
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+              mode: parallel
+              continue-on-error: true
+              map:
+                $map: 'http://ibm.com/appconnect/map/v1'
+                input:
+                  - variable: Foreachitem
+                    $ref: '#/block/For each/current-item'
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: SalesforceUpdateorcreateaccount
+                    $ref: >-
+                      #/block/For each/node-output/Salesforce Update or create
+                      account/response/payload
+                  - variable: SalesforceUpdateorcreateaccountMetadata
+                    $ref: >-
+                      #/block/For each/node-output/Salesforce Update or create
+                      account/response
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+                mappings: []
+              display-name: Customer in external create/update account on salesforce system
+          - update-action:
+              name: IBM Cloudant Update document 2
+              target:
+                $ref: '#/integration/action-interfaces/action-interface-7'
+              map:
+                mappings:
+                  - data:
+                      mappings:
+                        - intialruntime:
+                            template: >-
+                              {{$IBMCloudantRetrievedocuments.data.intialruntime}}
+                        - lastruntime:
+                            template: '{{$HTTPInvokemethod.responseHeaders.date}}'
+                  - db_name:
+                      template: config
+                customSchemas:
+                  properties.`data`:
+                    type: object
+                    properties:
+                      lastruntime:
+                        type: string
+                      intialruntime:
+                        type: string
+                $map: 'http://ibm.com/appconnect/map/v1'
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+                  - variable: Foreach
+                    $ref: '#/node-output/For each/response/payload'
+              filter:
+                where:
+                  and:
+                    - _id: salesforcesyncaccountsconfig
+                    - db_name: config
+                input:
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+                  - variable: Foreach
+                    $ref: '#/node-output/For each/response/payload'
+              allow-empty-output: true
+          - if:
+              name: If 5
+              input:
+                - variable: Trigger
+                  $ref: '#/trigger/payload'
+                - variable: IBMCloudantRetrievedocuments
+                  $ref: >-
+                    #/node-output/IBM Cloudant Retrieve
+                    documents/response/payload
+                - variable: IBMCloudantRetrievedocumentsMetadata
+                  $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                - variable: If2
+                  $ref: '#/node-output/If 2/response/payload'
+                - variable: HTTPInvokemethod
+                  $ref: '#/node-output/HTTP Invoke method/response/payload'
+                - variable: HTTPInvokemethodMetadata
+                  $ref: '#/node-output/HTTP Invoke method/response'
+                - variable: JSONParserParse
+                  $ref: '#/node-output/JSON Parser Parse/response/payload'
+                - variable: Foreach
+                  $ref: '#/node-output/For each/response/payload'
+                - variable: IBMCloudantUpdatedocument2
+                  $ref: >-
+                    #/node-output/IBM Cloudant Update document
+                    2/response/payload
+                - variable: IBMCloudantUpdatedocument2Metadata
+                  $ref: '#/node-output/IBM Cloudant Update document 2/response'
+              branch:
+                - condition:
+                    '{{$IBMCloudantUpdatedocument2Metadata."status-code"}}': '200'
+                  execute:
+                    - logging:
+                        name: Log 7
+                        map:
+                          $map: 'http://ibm.com/appconnect/map/v1'
+                          input:
+                            - variable: Trigger
+                              $ref: '#/trigger/payload'
+                            - variable: IBMCloudantRetrievedocuments
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response/payload
+                            - variable: IBMCloudantRetrievedocumentsMetadata
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response
+                            - variable: If2
+                              $ref: '#/node-output/If 2/response/payload'
+                            - variable: HTTPInvokemethod
+                              $ref: >-
+                                #/node-output/HTTP Invoke
+                                method/response/payload
+                            - variable: HTTPInvokemethodMetadata
+                              $ref: '#/node-output/HTTP Invoke method/response'
+                            - variable: JSONParserParse
+                              $ref: '#/node-output/JSON Parser Parse/response/payload'
+                            - variable: Foreach
+                              $ref: '#/node-output/For each/response/payload'
+                            - variable: IBMCloudantUpdatedocument2
+                              $ref: >-
+                                #/node-output/IBM Cloudant Update document
+                                2/response/payload
+                            - variable: IBMCloudantUpdatedocument2Metadata
+                              $ref: >-
+                                #/node-output/IBM Cloudant Update document
+                                2/response
+                          mappings:
+                            - logLevel:
+                                template: Info
+                            - logMessage:
+                                template: >-
+                                  {{$IBMCloudantUpdatedocument2._id}} document
+                                  was updated succesfully 
+              else:
+                execute:
+                  - logging:
+                      name: Log 8
+                      map:
+                        $map: 'http://ibm.com/appconnect/map/v1'
+                        input:
+                          - variable: Trigger
+                            $ref: '#/trigger/payload'
+                          - variable: IBMCloudantRetrievedocuments
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response/payload
+                          - variable: IBMCloudantRetrievedocumentsMetadata
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response
+                          - variable: If2
+                            $ref: '#/node-output/If 2/response/payload'
+                          - variable: HTTPInvokemethod
+                            $ref: '#/node-output/HTTP Invoke method/response/payload'
+                          - variable: HTTPInvokemethodMetadata
+                            $ref: '#/node-output/HTTP Invoke method/response'
+                          - variable: JSONParserParse
+                            $ref: '#/node-output/JSON Parser Parse/response/payload'
+                          - variable: Foreach
+                            $ref: '#/node-output/For each/response/payload'
+                          - variable: IBMCloudantUpdatedocument2
+                            $ref: >-
+                              #/node-output/IBM Cloudant Update document
+                              2/response/payload
+                          - variable: IBMCloudantUpdatedocument2Metadata
+                            $ref: >-
+                              #/node-output/IBM Cloudant Update document
+                              2/response
+                        mappings:
+                          - logLevel:
+                              template: Error
+                          - logMessage:
+                              template: >-
+                                failed to update doc
+                                {{$IBMCloudantUpdatedocument2._id}} with status
+                                {{$IBMCloudantUpdatedocument2Metadata."status-code"}} 
+              output-schema: {}
+    assembly-2:
+      assembly:
+        execute:
+          - upsert-action:
+              name: Salesforce Update or create account
+              target:
+                $ref: '#/integration/action-interfaces/action-interface-2'
+              map:
+                mappings:
+                  - Name:
+                      template: '{{$Foreachitem.CustomerName}}'
+                $map: 'http://ibm.com/appconnect/map/v1'
+                input:
+                  - variable: Foreachitem
+                    $ref: '#/block/For each/current-item'
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+              filter:
+                where:
+                  CustomerId__c: '{{$Foreachitem.CustomerId}}'
+                input:
+                  - variable: Foreachitem
+                    $ref: '#/block/For each/current-item'
+                  - variable: Trigger
+                    $ref: '#/trigger/payload'
+                  - variable: IBMCloudantRetrievedocuments
+                    $ref: >-
+                      #/node-output/IBM Cloudant Retrieve
+                      documents/response/payload
+                  - variable: IBMCloudantRetrievedocumentsMetadata
+                    $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                  - variable: If2
+                    $ref: '#/node-output/If 2/response/payload'
+                  - variable: HTTPInvokemethod
+                    $ref: '#/node-output/HTTP Invoke method/response/payload'
+                  - variable: HTTPInvokemethodMetadata
+                    $ref: '#/node-output/HTTP Invoke method/response'
+                  - variable: JSONParserParse
+                    $ref: '#/node-output/JSON Parser Parse/response/payload'
+          - if:
+              name: If
+              input:
+                - variable: Foreachitem
+                  $ref: '#/block/For each/current-item'
+                - variable: Trigger
+                  $ref: '#/trigger/payload'
+                - variable: SalesforceUpdateorcreateaccount
+                  $ref: >-
+                    #/block/For each/node-output/Salesforce Update or create
+                    account/response/payload
+                - variable: SalesforceUpdateorcreateaccountMetadata
+                  $ref: >-
+                    #/block/For each/node-output/Salesforce Update or create
+                    account/response
+                - variable: IBMCloudantRetrievedocuments
+                  $ref: >-
+                    #/node-output/IBM Cloudant Retrieve
+                    documents/response/payload
+                - variable: IBMCloudantRetrievedocumentsMetadata
+                  $ref: '#/node-output/IBM Cloudant Retrieve documents/response'
+                - variable: HTTPInvokemethod
+                  $ref: '#/node-output/HTTP Invoke method/response/payload'
+                - variable: HTTPInvokemethodMetadata
+                  $ref: '#/node-output/HTTP Invoke method/response'
+                - variable: JSONParserParse
+                  $ref: '#/node-output/JSON Parser Parse/response/payload'
+              branch:
+                - condition:
+                    or:
+                      - '{{$SalesforceUpdateorcreateaccountMetadata."status-code"}}': '201'
+                      - '{{$SalesforceUpdateorcreateaccountMetadata."status-code"}}': '200'
+                  execute:
+                    - logging:
+                        name: Log
+                        map:
+                          $map: 'http://ibm.com/appconnect/map/v1'
+                          input:
+                            - variable: Foreachitem
+                              $ref: '#/block/For each/current-item'
+                            - variable: Trigger
+                              $ref: '#/trigger/payload'
+                            - variable: SalesforceUpdateorcreateaccount
+                              $ref: >-
+                                #/block/For each/node-output/Salesforce Update
+                                or create account/response/payload
+                            - variable: SalesforceUpdateorcreateaccountMetadata
+                              $ref: >-
+                                #/block/For each/node-output/Salesforce Update
+                                or create account/response
+                            - variable: IBMCloudantRetrievedocuments
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response/payload
+                            - variable: IBMCloudantRetrievedocumentsMetadata
+                              $ref: >-
+                                #/node-output/IBM Cloudant Retrieve
+                                documents/response
+                            - variable: If2
+                              $ref: '#/node-output/If 2/response/payload'
+                            - variable: HTTPInvokemethod
+                              $ref: >-
+                                #/node-output/HTTP Invoke
+                                method/response/payload
+                            - variable: HTTPInvokemethodMetadata
+                              $ref: '#/node-output/HTTP Invoke method/response'
+                            - variable: JSONParserParse
+                              $ref: '#/node-output/JSON Parser Parse/response/payload'
+                          mappings:
+                            - logLevel:
+                                template: Info
+                            - logMessage:
+                                template: >-
+                                  Cus
+                                  {{$SalesforceUpdateorcreateaccount.CustomerId__c}}
+                                  Created/updated Succefully 
+              else:
+                execute:
+                  - logging:
+                      name: Log 2
+                      map:
+                        $map: 'http://ibm.com/appconnect/map/v1'
+                        input:
+                          - variable: Foreachitem
+                            $ref: '#/block/For each/current-item'
+                          - variable: Trigger
+                            $ref: '#/trigger/payload'
+                          - variable: SalesforceUpdateorcreateaccount
+                            $ref: >-
+                              #/block/For each/node-output/Salesforce Update or
+                              create account/response/payload
+                          - variable: SalesforceUpdateorcreateaccountMetadata
+                            $ref: >-
+                              #/block/For each/node-output/Salesforce Update or
+                              create account/response
+                          - variable: IBMCloudantRetrievedocuments
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response/payload
+                          - variable: IBMCloudantRetrievedocumentsMetadata
+                            $ref: >-
+                              #/node-output/IBM Cloudant Retrieve
+                              documents/response
+                          - variable: If2
+                            $ref: '#/node-output/If 2/response/payload'
+                          - variable: HTTPInvokemethod
+                            $ref: '#/node-output/HTTP Invoke method/response/payload'
+                          - variable: HTTPInvokemethodMetadata
+                            $ref: '#/node-output/HTTP Invoke method/response'
+                          - variable: JSONParserParse
+                            $ref: '#/node-output/JSON Parser Parse/response/payload'
+                        mappings:
+                          - logLevel:
+                              template: Error
+                          - logMessage:
+                              template: >-
+                                Customer Create/updae failed
+                                {{$SalesforceUpdateorcreateaccount.CustomerId__c}}
+                                with status
+                                {{$SalesforceUpdateorcreateaccountMetadata."status-code"}}
+              output-schema: {}
+  name: Synchronize Accounts between external system and salesforce
+models: {}
